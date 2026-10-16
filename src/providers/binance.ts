@@ -3,13 +3,17 @@ import type { Candle, Interval, MarketDataProvider } from "../types.ts";
 /**
  * Binance spot market data via the public REST API (no API key needed).
  * Symbols use Binance notation without a separator, e.g. "BTCUSDC".
+ *
+ * Uses data-api.binance.vision, Binance's market-data-only mirror: same data as
+ * api.binance.com, but reachable from regions where api.binance.com returns
+ * HTTP 451 (e.g. US-hosted GitHub Actions runners).
  * Docs: https://developers.binance.com/docs/binance-spot-api-docs/rest-api/market-data-endpoints
  */
 export class BinanceProvider implements MarketDataProvider {
   readonly name = "binance";
   private readonly baseUrl: string;
 
-  constructor(baseUrl = "https://api.binance.com") {
+  constructor(baseUrl = "https://data-api.binance.vision") {
     this.baseUrl = baseUrl;
   }
 
