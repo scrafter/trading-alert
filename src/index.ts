@@ -1,62 +1,68 @@
+import type { Alert, Interval, MarketDataProvider, Notifier, Strategy } from "./types.ts";
+import { RsiStrategy } from "./strategies/rsi.ts";
+import { MacdStrategy } from "./strategies/macd.ts";
+import { BinanceProvider } from "./providers/binance.ts";
+import { ConsoleNotifier } from "./notifiers/console.ts";
+import { TelegramNotifier } from "./notifiers/telegram.ts";
+
 // ============================================================================
 // CONFIGURATION — edit this section
 // ============================================================================
 
-/** Default RSI settings, used by every instrument unless it overrides them. */
-const DEFAULTS = {
-  /** Alert when RSI rises above this value. */
-  overbought: 70,
-  /** Alert when RSI drops below this value. */
-  oversold: 30,
-  /** RSI lookback period (14 is the standard). */
-  rsiPeriod: 14,
-  /** Candle interval the RSI is computed on. */
+/**
+ * What to watch. Enable, disable or tune strategies here; each one alerts on its own.
+ * To add a new kind of signal, implement `Strategy` (src/types.ts) in src/strategies/.
+ */
+const STRATEGIES = {
+  rsi: new RsiStrategy({ period: 14, overbought: 70, oversold: 30 }),
+  macd: new MacdStrategy({ fast: 12, slow: 26, signal: 9 }),
+} satisfies Record<string, Strategy>;
+
+/** Defaults for every instrument; any key can be overridden per instrument. */
+const DEFAULTS: InstrumentDefaults = {
+  /** Strategies to run (keys of STRATEGIES). */
+  strategies: ["rsi"],
+  /** Candle interval the strategies run on. */
   interval: "1h",
   /**
    * true  = only use fully closed candles (no flickering alerts, but up to one candle late).
-   * false = include the still-forming candle (faster, but RSI can cross back before close).
+   * false = include the still-forming candle (faster, but signals can reverse before close).
    */
   closedCandlesOnly: true,
-} satisfies Omit<InstrumentConfig, "label" | "symbol" | "provider">;
+};
 
-/** Instruments to watch. Add more entries here; any DEFAULTS key can be overridden per entry. */
+/** Instruments to watch. */
 const INSTRUMENTS: InstrumentConfig[] = [
   { label: "BTC/USDC", symbol: "BTCUSDC", provider: "binance" },
-  // { label: "ETH/USDC", symbol: "ETHUSDC", provider: "binance", interval: "4h" },
-  // { label: "SOL/USDC", symbol: "SOLUSDC", provider: "binance", overbought: 75, oversold: 25 },
+  // { label: "ETH/USDC", symbol: "ETHUSDC", provider: "binance", strategies: ["rsi", "macd"], interval: "4h" },
 ];
 
 /** How often to re-check all instruments. */
 const CHECK_EVERY_SECONDS = 60;
 
-/** How many candles to download. More history = RSI closer to TradingView values. */
+/** How many candles to download. More history = indicator values closer to TradingView. */
 const CANDLE_HISTORY = 500;
 
 // ============================================================================
-
-import type { AlertKind, Interval, MarketDataProvider, Notifier } from "./types.ts";
-import { rsi } from "./rsi.ts";
-import { BinanceProvider } from "./providers/binance.ts";
-import { ConsoleNotifier } from "./notifiers/console.ts";
-import { TelegramNotifier } from "./notifiers/telegram.ts";
-
-interface InstrumentConfig {
-  /** Human-readable name used in alerts. */
-  label: string;
-  /** Symbol as the provider expects it. */
-  symbol: string;
-  provider: keyof typeof PROVIDERS;
-  overbought?: number;
-  oversold?: number;
-  rsiPeriod?: number;
-  interval?: Interval;
-  closedCandlesOnly?: boolean;
-}
 
 /** Register new data sources here (e.g. a Yahoo Finance provider for stocks). */
 const PROVIDERS = {
   binance: new BinanceProvider(),
 } satisfies Record<string, MarketDataProvider>;
+
+interface InstrumentDefaults {
+  strategies: (keyof typeof STRATEGIES)[];
+  interval: Interval;
+  closedCandlesOnly: boolean;
+}
+
+interface InstrumentConfig extends Partial<InstrumentDefaults> {
+  /** Human-readable name used in alerts. */
+  label: string;
+  /** Symbol as the provider expects it. */
+  symbol: string;
+  provider: keyof typeof PROVIDERS;
+}
 
 function buildNotifiers(): Notifier[] {
   const notifiers: Notifier[] = [new ConsoleNotifier()];
@@ -67,13 +73,11 @@ function buildNotifiers(): Notifier[] {
   return notifiers;
 }
 
-type Zone = AlertKind | "neutral";
-
 /**
- * Last known zone per instrument. An alert fires only when an instrument
- * *enters* the overbought/oversold zone, not on every check while it stays there.
+ * Last state per instrument + strategy. An alert fires only when the state
+ * changes to a non-null value, not on every check while it stays the same.
  */
-const lastZone = new Map<string, Zone>();
+const lastState = new Map<string, string | null>();
 
 async function checkInstrument(cfg: InstrumentConfig, notifiers: Notifier[]): Promise<void> {
   const c = { ...DEFAULTS, ...cfg };
@@ -86,27 +90,34 @@ async function checkInstrument(cfg: InstrumentConfig, notifiers: Notifier[]): Pr
   const last = candles.at(-1);
   if (!last) throw new Error(`No candles returned for ${c.label}`);
 
-  const value = rsi(candles.map((k) => k.close), c.rsiPeriod).at(-1)!;
-  const zone: Zone = value > c.overbought ? "overbought" : value < c.oversold ? "oversold" : "neutral";
-  const previous = lastZone.get(c.label);
-  lastZone.set(c.label, zone);
+  for (const key of c.strategies) {
+    const strategy: Strategy = STRATEGIES[key];
+    const { state, summary, message } = strategy.evaluate(candles);
 
-  console.log(
-    `${new Date().toISOString()}  ${c.label.padEnd(10)} RSI(${c.rsiPeriod}, ${c.interval}) = ${value.toFixed(2)}  ` +
-      `price ${last.close}  [${zone}]`,
-  );
+    const stateKey = `${c.label}|${strategy.name}`;
+    const previous = lastState.get(stateKey);
+    lastState.set(stateKey, state);
 
-  if (zone === "neutral" || zone === previous) return;
+    console.log(
+      `${new Date().toISOString()}  ${c.label.padEnd(10)} ${c.interval.padEnd(3)} ${summary}  ` +
+        `price ${last.close}  [${state ?? "neutral"}]`,
+    );
 
-  const alert = {
-    instrument: c.label,
-    kind: zone,
-    rsi: value,
-    threshold: zone === "overbought" ? c.overbought : c.oversold,
-    price: last.close,
-    interval: c.interval,
-    candleCloseTime: last.closeTime,
-  };
+    if (state === null || state === previous) continue;
+
+    await notify(notifiers, {
+      instrument: c.label,
+      strategy: strategy.name,
+      state,
+      message,
+      price: last.close,
+      interval: c.interval,
+      candleCloseTime: last.closeTime,
+    });
+  }
+}
+
+async function notify(notifiers: Notifier[], alert: Alert): Promise<void> {
   const results = await Promise.allSettled(notifiers.map((n) => n.send(alert)));
   results.forEach((r, i) => {
     if (r.status === "rejected") console.error(`Notifier "${notifiers[i].name}" failed:`, r.reason);

@@ -21,13 +21,33 @@ export interface MarketDataProvider {
   getCandles(symbol: string, interval: Interval, limit: number): Promise<Candle[]>;
 }
 
-export type AlertKind = "overbought" | "oversold";
+/** Result of running a strategy on the latest candles. */
+export interface Evaluation {
+  /**
+   * What the strategy currently sees, e.g. "overbought" or "bullish_cross".
+   * null means nothing notable. An alert fires whenever the state changes
+   * to a non-null value, so a state that persists does not re-alert.
+   */
+  state: string | null;
+  /** Short status for the log line, e.g. "RSI(14) = 52.65". */
+  summary: string;
+  /** Human-readable alert text; used when state is non-null. */
+  message: string;
+}
+
+/** Something to watch on an instrument (RSI levels, MACD crossovers, ...). */
+export interface Strategy {
+  /** Unique, includes parameters, e.g. "RSI(14)". */
+  readonly name: string;
+  /** candles are sorted oldest to newest. */
+  evaluate(candles: Candle[]): Evaluation;
+}
 
 export interface Alert {
   instrument: string;
-  kind: AlertKind;
-  rsi: number;
-  threshold: number;
+  strategy: string;
+  state: string;
+  message: string;
   price: number;
   interval: Interval;
   candleCloseTime: number;

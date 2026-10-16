@@ -1,6 +1,9 @@
 # trading-alert
 
-Sends an alert when an instrument's RSI rises above an "overbought" level (default 70) or drops below an "oversold" level (default 30).
+Watches market instruments and sends alerts based on pluggable strategies:
+
+- **RSI**: RSI rises above an "overbought" level (default 70) or drops below an "oversold" level (default 30). Enabled by default.
+- **MACD**: MACD line crosses its signal line (bullish / bearish). Available, off by default.
 
 Market data comes from the public Binance spot API (no API key needed). Currently watching **BTC/USDC**.
 
@@ -22,11 +25,12 @@ npm run typecheck
 
 Everything lives at the top of [`src/index.ts`](src/index.ts):
 
-- `DEFAULTS`: thresholds (`overbought`, `oversold`), `rsiPeriod`, candle `interval`, `closedCandlesOnly`
+- `STRATEGIES`: strategy instances and their parameters (RSI thresholds, MACD periods, ...)
+- `DEFAULTS`: which strategies run (`strategies: ["rsi"]`, or e.g. `["rsi", "macd"]`), candle `interval`, `closedCandlesOnly`
 - `INSTRUMENTS`: list of instruments to watch; each entry can override any default
 - `CHECK_EVERY_SECONDS`, `CANDLE_HISTORY`
 
-An alert fires once when RSI **enters** a zone, not on every check while it stays there.
+An alert fires once when a strategy's state **changes** (e.g. RSI enters the overbought zone), not on every check while it stays there.
 
 ### Notifications
 
@@ -40,5 +44,6 @@ export TELEGRAM_CHAT_ID=...
 ## Extending
 
 - **New instrument on Binance**: add a line to `INSTRUMENTS`.
+- **New strategy** (Bollinger Bands, moving-average cross, ...): implement `Strategy` from `src/types.ts` in `src/strategies/` (pure indicator math goes in `src/indicators/`), then add it to `STRATEGIES`. `evaluate()` returns a `state` (null = nothing notable) and an alert message.
 - **New data source** (e.g. Yahoo for stocks): implement `MarketDataProvider` from `src/types.ts` in `src/providers/`, then register it in `PROVIDERS`.
 - **New alert channel** (e-mail, Slack, ...): implement `Notifier` in `src/notifiers/` and add it in `buildNotifiers()`.
