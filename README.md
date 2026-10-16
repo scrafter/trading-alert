@@ -21,6 +21,16 @@ npm test           # indicator unit tests
 npm run typecheck
 ```
 
+## Running on GitHub Actions
+
+[`.github/workflows/alerts.yml`](.github/workflows/alerts.yml) runs `--once` every 10 minutes (and on demand from the Actions tab).
+
+- Credentials come from repository secrets `WHATSAPP_PHONE` and `CALLMEBOT_API_KEY` (Settings → Secrets and variables → Actions).
+- Alert state (`.state/alert-state.json`) is carried between runs via the Actions cache, so a zone is reported once, not every run.
+- A run fails (red) when data can't be fetched or a notification can't be sent; GitHub e-mails you about failed runs.
+- GitHub may delay scheduled runs by several minutes, and disables schedules in public repos after 60 days without commits (re-enable in the Actions tab).
+- Don't run `npm start` locally at the same time, or you'll get every alert twice.
+
 ## Configuration
 
 Everything lives at the top of [`src/index.ts`](src/index.ts):

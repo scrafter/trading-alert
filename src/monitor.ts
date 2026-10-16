@@ -1,4 +1,5 @@
 import type { Alert, Interval, MarketDataProvider, Notifier, Strategy } from "./types.ts";
+import type { AlertState } from "./state.ts";
 
 export interface WatchTarget {
   /** Human-readable name used in alerts. */
@@ -16,6 +17,8 @@ export interface MonitorOptions {
   targets: WatchTarget[];
   notifiers: Notifier[];
   candleHistory: number;
+  /** State from a previous run (see FileStateStore); defaults to empty. */
+  initialState?: AlertState;
 }
 
 /**
@@ -29,18 +32,31 @@ export class AlertMonitor {
    * Last state per target + strategy. An alert fires only when the state
    * changes to a non-null value, not on every check while it stays the same.
    */
-  private readonly lastState = new Map<string, string | null>();
+  private readonly lastState: AlertState;
+  private failures = 0;
 
   constructor(opts: MonitorOptions) {
     this.opts = opts;
+    this.lastState = new Map(opts.initialState);
   }
 
-  async checkAll(): Promise<void> {
+  /** Current state, to persist between runs. */
+  get state(): AlertState {
+    return this.lastState;
+  }
+
+  /** Checks every target. Returns the number of failures (data fetch or notifier errors). */
+  async checkAll(): Promise<number> {
+    this.failures = 0;
     await Promise.all(
       this.opts.targets.map((t) =>
-        this.check(t).catch((err) => console.error(`Check failed for ${t.label}:`, err)),
+        this.check(t).catch((err) => {
+          this.failures++;
+          console.error(`Check failed for ${t.label}:`, err);
+        }),
       ),
     );
+    return this.failures;
   }
 
   private async check(t: WatchTarget): Promise<void> {
@@ -83,7 +99,10 @@ export class AlertMonitor {
     const { notifiers } = this.opts;
     const results = await Promise.allSettled(notifiers.map((n) => n.send(alert)));
     results.forEach((r, i) => {
-      if (r.status === "rejected") console.error(`Notifier "${notifiers[i].name}" failed:`, r.reason);
+      if (r.status === "rejected") {
+        this.failures++;
+        console.error(`Notifier "${notifiers[i].name}" failed:`, r.reason);
+      }
     });
   }
 }

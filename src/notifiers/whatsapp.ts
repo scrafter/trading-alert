@@ -29,7 +29,13 @@ export class WhatsAppNotifier implements Notifier {
     // CallMeBot reports errors (e.g. an invalid API key) as HTTP 203 with an HTML page.
     if (res.status !== 200) {
       const body = (await res.text()).replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
-      throw new Error(`CallMeBot ${res.status}: ${body}`);
+      throw new Error(`CallMeBot ${res.status}: ${this.redact(body)}`);
     }
+  }
+
+  /** CallMeBot echoes the phone number in its responses; keep it out of (possibly public) logs. */
+  private redact(text: string): string {
+    const digits = this.phone.replace(/\D/g, "");
+    return text.replaceAll(`+${digits}`, "[phone]").replaceAll(digits, "[phone]").replaceAll(this.apiKey, "[apikey]");
   }
 }

@@ -5,6 +5,7 @@ import { BinanceProvider } from "./providers/binance.ts";
 import { createNotifiers, type NotifierName } from "./notifiers/index.ts";
 import { FORMATTERS, type Language } from "./messages/index.ts";
 import { AlertMonitor } from "./monitor.ts";
+import { FileStateStore } from "./state.ts";
 
 // ============================================================================
 // CONFIGURATION — edit this section
@@ -47,8 +48,11 @@ const INSTRUMENTS: InstrumentConfig[] = [
   // { label: "ETH/USDC", symbol: "ETHUSDC", provider: "binance", strategies: ["rsi", "macd"], interval: "4h" },
 ];
 
-/** How often to re-check all instruments. */
+/** How often to re-check all instruments when running continuously (`npm start`). */
 const CHECK_EVERY_SECONDS = 60;
+
+/** Where alert state is kept between runs (cached between GitHub Actions runs). */
+const STATE_FILE = ".state/alert-state.json";
 
 /** How many candles to download. More history = indicator values closer to TradingView. */
 const CANDLE_HISTORY = 500;
@@ -78,8 +82,10 @@ async function main(): Promise<void> {
   const notifiers = createNotifiers(NOTIFY_VIA, FORMATTERS[ALERT_LANGUAGE]);
   console.log(`Notifiers: ${notifiers.map((n) => n.name).join(", ")}`);
 
+  const store = new FileStateStore(STATE_FILE);
   const monitor = new AlertMonitor({
     notifiers,
+    initialState: await store.load(),
     candleHistory: CANDLE_HISTORY,
     targets: INSTRUMENTS.map((cfg) => {
       const c = { ...DEFAULTS, ...cfg };
@@ -94,10 +100,20 @@ async function main(): Promise<void> {
     }),
   });
 
-  await monitor.checkAll();
-  if (process.argv.includes("--once")) return;
+  const run = async () => {
+    const failures = await monitor.checkAll();
+    await store.save(monitor.state);
+    return failures;
+  };
 
-  setInterval(() => void monitor.checkAll(), CHECK_EVERY_SECONDS * 1000);
+  if (process.argv.includes("--once")) {
+    // Non-zero exit marks the CI run as failed, so errors don't go unnoticed.
+    if ((await run()) > 0) process.exitCode = 1;
+    return;
+  }
+
+  await run();
+  setInterval(() => void run(), CHECK_EVERY_SECONDS * 1000);
 }
 
 await main();

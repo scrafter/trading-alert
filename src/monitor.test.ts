@@ -37,6 +37,20 @@ test("a failing notifier does not block the others", async () => {
     ],
     targets: [{ label: "X", symbol: "X", provider, strategies: [strategy], interval: "1h", closedCandlesOnly: false }],
   });
-  await monitor.checkAll();
+  assert.equal(await monitor.checkAll(), 1, "the broken notifier is reported as a failure");
   assert.deepEqual(sent, ["on"]);
+});
+
+test("restored state prevents re-alerting a zone reported by a previous run", async () => {
+  const strategy: Strategy = { name: "FAKE", evaluate: () => ({ state: "overbought", summary: "", message: "", values: {} }) };
+  const sent: string[] = [];
+  const monitor = new AlertMonitor({
+    candleHistory: 10,
+    notifiers: [{ name: "spy", send: async (a) => void sent.push(a.state) }],
+    targets: [{ label: "X", symbol: "X", provider, strategies: [strategy], interval: "1h", closedCandlesOnly: false }],
+    initialState: new Map([["X|1h|FAKE", "overbought"]]),
+  });
+  await monitor.checkAll();
+  assert.deepEqual(sent, []);
+  assert.equal(monitor.state.get("X|1h|FAKE"), "overbought");
 });
