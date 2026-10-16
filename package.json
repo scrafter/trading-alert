@@ -1,0 +1,20 @@
+{
+  "name": "trading-alert",
+  "version": "0.1.0",
+  "private": true,
+  "description": "RSI alerts for crypto/market instruments",
+  "type": "module",
+  "engines": {
+    "node": ">=23.6"
+  },
+  "scripts": {
+    "start": "node src/index.ts",
+    "once": "node src/index.ts --once",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test src/**/*.test.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.9.0"
+  }
+}
