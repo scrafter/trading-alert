@@ -17,7 +17,7 @@ Node.js >= 23.6 (runs TypeScript directly, no build step).
 npm install
 npm start          # check every CHECK_EVERY_SECONDS, runs until stopped
 npm run once       # single check, then exit (handy for cron)
-npm test           # RSI unit tests
+npm test           # indicator unit tests
 npm run typecheck
 ```
 
