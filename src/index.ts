@@ -3,6 +3,7 @@ import { RsiStrategy } from "./strategies/rsi.ts";
 import { MacdStrategy } from "./strategies/macd.ts";
 import { BinanceProvider } from "./providers/binance.ts";
 import { createNotifiers, type NotifierName } from "./notifiers/index.ts";
+import { FORMATTERS, type Language } from "./messages/index.ts";
 import { AlertMonitor } from "./monitor.ts";
 
 // ============================================================================
@@ -24,12 +25,15 @@ const STRATEGIES = {
  */
 const NOTIFY_VIA: NotifierName[] = ["console", "whatsapp"];
 
+/** Language of alert messages: "pl" or "en" (see src/messages/). */
+const ALERT_LANGUAGE: Language = "pl";
+
 /** Defaults for every instrument; any key can be overridden per instrument. */
 const DEFAULTS: InstrumentDefaults = {
   /** Strategies to run (keys of STRATEGIES). */
   strategies: ["rsi"],
   /** Candle interval the strategies run on. */
-  interval: "1h",
+  interval: "15m",
   /**
    * true  = only use fully closed candles (no flickering alerts, but up to one candle late).
    * false = include the still-forming candle (faster, but signals can reverse before close).
@@ -71,7 +75,7 @@ interface InstrumentConfig extends Partial<InstrumentDefaults> {
 }
 
 async function main(): Promise<void> {
-  const notifiers = createNotifiers(NOTIFY_VIA);
+  const notifiers = createNotifiers(NOTIFY_VIA, FORMATTERS[ALERT_LANGUAGE]);
   console.log(`Notifiers: ${notifiers.map((n) => n.name).join(", ")}`);
 
   const monitor = new AlertMonitor({

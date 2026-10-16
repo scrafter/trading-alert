@@ -52,7 +52,7 @@ export class AlertMonitor {
     if (!last) throw new Error(`No candles returned for ${t.label}`);
 
     for (const strategy of t.strategies) {
-      const { state, summary, message } = strategy.evaluate(candles);
+      const { state, summary, message, values } = strategy.evaluate(candles);
 
       const stateKey = `${t.label}|${t.interval}|${strategy.name}`;
       const previous = this.lastState.get(stateKey);
@@ -70,6 +70,7 @@ export class AlertMonitor {
         strategy: strategy.name,
         state,
         message,
+        values,
         price: last.close,
         interval: t.interval,
         candleCloseTime: last.closeTime,

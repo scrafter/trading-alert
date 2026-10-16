@@ -27,7 +27,8 @@ Everything lives at the top of [`src/index.ts`](src/index.ts):
 
 - `STRATEGIES`: strategy instances and their parameters (RSI thresholds, MACD periods, ...)
 - `NOTIFY_VIA`: alert channels, e.g. `["console", "whatsapp"]` or `["console", "telegram"]`
-- `DEFAULTS`: which strategies run (`strategies: ["rsi"]`, or e.g. `["rsi", "macd"]`), candle `interval`, `closedCandlesOnly`
+- `ALERT_LANGUAGE`: `"pl"` (default) or `"en"`
+- `DEFAULTS`: which strategies run (`strategies: ["rsi"]`, or e.g. `["rsi", "macd"]`), candle `interval` (default `15m`), `closedCandlesOnly`
 - `INSTRUMENTS`: list of instruments to watch; each entry can override any default
 - `CHECK_EVERY_SECONDS`, `CANDLE_HISTORY`
 
@@ -57,6 +58,7 @@ The startup line `Notifiers: ...` shows which channels are active.
 - **New instrument on Binance**: add a line to `INSTRUMENTS`.
 - **New strategy** (Bollinger Bands, moving-average cross, ...): implement `Strategy` from `src/types.ts` in `src/strategies/` (pure indicator math goes in `src/indicators/`), then add it to `STRATEGIES`. `evaluate()` returns a `state` (null = nothing notable) and an alert message.
 - **New data source** (e.g. Yahoo for stocks): implement `MarketDataProvider` from `src/types.ts` in `src/providers/`, then register it in `PROVIDERS`.
+- **New language**: implement `AlertFormatter` in `src/messages/` and register it in `FORMATTERS`.
 - **New alert channel** (e-mail, Slack, ...): implement `Notifier` in `src/notifiers/`, register a factory in `NOTIFIERS` (`src/notifiers/index.ts`), then add its name to `NOTIFY_VIA`.
 
 ## Architecture
@@ -69,6 +71,10 @@ src/providers/     data sources (Binance)
 src/indicators/    pure indicator math (RSI, EMA, MACD)
 src/strategies/    turn indicator values into alert states
 src/notifiers/     alert channels (console, WhatsApp, Telegram) + registry
+src/messages/      alert text per language (en, pl); notifiers get a formatter injected
 ```
+
+Strategies return a state plus raw values; turning that into text is the job of `src/messages/`.
+`src/messages/pl.ts` is the only file with Polish text (the alert recipient's language).
 
 `AlertMonitor` only depends on the interfaces, so providers, strategies and channels can be swapped independently (and faked in tests).

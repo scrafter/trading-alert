@@ -11,7 +11,7 @@ test("alerts only when the strategy state changes to non-null", async () => {
   let call = 0;
   const strategy: Strategy = {
     name: "FAKE",
-    evaluate: () => ({ state: states[call++], summary: "", message: "msg" }),
+    evaluate: () => ({ state: states[call++], summary: "", message: "msg", values: {} }),
   };
   const sent: Alert[] = [];
   const notifier: Notifier = { name: "spy", send: async (a) => void sent.push(a) };
@@ -27,7 +27,7 @@ test("alerts only when the strategy state changes to non-null", async () => {
 });
 
 test("a failing notifier does not block the others", async () => {
-  const strategy: Strategy = { name: "FAKE", evaluate: () => ({ state: "on", summary: "", message: "" }) };
+  const strategy: Strategy = { name: "FAKE", evaluate: () => ({ state: "on", summary: "", message: "", values: {} }) };
   const sent: string[] = [];
   const monitor = new AlertMonitor({
     candleHistory: 10,

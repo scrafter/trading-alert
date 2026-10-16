@@ -24,14 +24,15 @@ export class MacdStrategy implements Strategy {
     const { fast, slow, signal } = this.opts;
     const points = macd(candles.map((k) => k.close), fast, slow, signal);
     const [prev, last] = points.slice(-2);
+    const values = { macd: last.macd, signal: last.signal, histogram: last.histogram };
     const summary = `${this.name} = ${last.macd.toFixed(2)} / signal ${last.signal.toFixed(2)}`;
 
     if (prev.histogram <= 0 && last.histogram > 0) {
-      return { state: "bullish_cross", summary, message: `${this.name} crossed above signal line (bullish)` };
+      return { state: "bullish_cross", summary, message: `${this.name} crossed above signal line (bullish)`, values };
     }
     if (prev.histogram >= 0 && last.histogram < 0) {
-      return { state: "bearish_cross", summary, message: `${this.name} crossed below signal line (bearish)` };
+      return { state: "bearish_cross", summary, message: `${this.name} crossed below signal line (bearish)`, values };
     }
-    return { state: null, summary, message: "" };
+    return { state: null, summary, message: "", values };
   }
 }

@@ -29,11 +29,21 @@ export class RsiStrategy implements Strategy {
     const summary = `${this.name} = ${value.toFixed(2)}`;
 
     if (value > overbought) {
-      return { state: "overbought", summary, message: `${summary} rose above ${overbought} (overbought)` };
+      return {
+        state: "overbought",
+        summary,
+        message: `${summary} rose above ${overbought} (overbought)`,
+        values: { rsi: value, threshold: overbought },
+      };
     }
     if (value < oversold) {
-      return { state: "oversold", summary, message: `${summary} dropped below ${oversold} (oversold)` };
+      return {
+        state: "oversold",
+        summary,
+        message: `${summary} dropped below ${oversold} (oversold)`,
+        values: { rsi: value, threshold: oversold },
+      };
     }
-    return { state: null, summary, message: "" };
+    return { state: null, summary, message: "", values: { rsi: value } };
   }
 }

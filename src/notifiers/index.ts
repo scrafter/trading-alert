@@ -1,4 +1,4 @@
-import type { Notifier } from "../types.ts";
+import type { AlertFormatter, Notifier } from "../types.ts";
 import { ConsoleNotifier } from "./console.ts";
 import { TelegramNotifier } from "./telegram.ts";
 import { WhatsAppNotifier } from "./whatsapp.ts";
@@ -9,15 +9,15 @@ import { WhatsAppNotifier } from "./whatsapp.ts";
  * `Notifier` in this folder and register a factory here.
  */
 export const NOTIFIERS = {
-  console: () => new ConsoleNotifier(),
-  whatsapp: () => new WhatsAppNotifier(requireEnv("WHATSAPP_PHONE"), requireEnv("CALLMEBOT_API_KEY")),
-  telegram: () => new TelegramNotifier(requireEnv("TELEGRAM_BOT_TOKEN"), requireEnv("TELEGRAM_CHAT_ID")),
-} satisfies Record<string, () => Notifier>;
+  console: (f) => new ConsoleNotifier(f),
+  whatsapp: (f) => new WhatsAppNotifier(requireEnv("WHATSAPP_PHONE"), requireEnv("CALLMEBOT_API_KEY"), f),
+  telegram: (f) => new TelegramNotifier(requireEnv("TELEGRAM_BOT_TOKEN"), requireEnv("TELEGRAM_CHAT_ID"), f),
+} satisfies Record<string, (formatter: AlertFormatter) => Notifier>;
 
 export type NotifierName = keyof typeof NOTIFIERS;
 
-export function createNotifiers(names: NotifierName[]): Notifier[] {
-  return names.map((name) => NOTIFIERS[name]());
+export function createNotifiers(names: NotifierName[], formatter: AlertFormatter): Notifier[] {
+  return names.map((name) => NOTIFIERS[name](formatter));
 }
 
 function requireEnv(name: string): string {

@@ -31,8 +31,10 @@ export interface Evaluation {
   state: string | null;
   /** Short status for the log line, e.g. "RSI(14) = 52.65". */
   summary: string;
-  /** Human-readable alert text; used when state is non-null. */
+  /** Default (English) alert text; used when state is non-null and no translation exists. */
   message: string;
+  /** Raw numbers behind the signal, e.g. { rsi: 72.4, threshold: 70 }, for message templates. */
+  values: Record<string, number>;
 }
 
 /** Something to watch on an instrument (RSI levels, MACD crossovers, ...). */
@@ -45,12 +47,26 @@ export interface Strategy {
 
 export interface Alert {
   instrument: string;
+  /** Strategy name with parameters, e.g. "RSI(14)". */
   strategy: string;
   state: string;
+  /** Default (English) text from the strategy. */
   message: string;
+  values: Record<string, number>;
   price: number;
   interval: Interval;
   candleCloseTime: number;
+}
+
+/** Alert rendered for people: a short title and a longer body. */
+export interface AlertText {
+  title: string;
+  body: string;
+}
+
+/** Turns an alert into human-readable text (one implementation per language). */
+export interface AlertFormatter {
+  format(alert: Alert): AlertText;
 }
 
 /** A channel that delivers alerts (console, Telegram, e-mail, ...). */
