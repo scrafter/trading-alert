@@ -8,8 +8,8 @@
     "node": ">=23.6"
   },
   "scripts": {
-    "start": "node src/index.ts",
-    "once": "node src/index.ts --once",
+    "start": "node --env-file-if-exists=.env src/index.ts",
+    "once": "node --env-file-if-exists=.env src/index.ts --once",
     "typecheck": "tsc --noEmit",
     "test": "node --test \"src/**/*.test.ts\""
   },
